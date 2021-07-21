@@ -14,13 +14,20 @@ struct ContentView: View {
     
     var body: some View {
         
+        let isError = !(error == nil)
+        let bgColour = isError ? UIColor.red : UIColor.green
+        let fgColour = isError ? UIColor.white : UIColor.black
+        let codeno = error?.code ?? 0
+        let code = (codeno == 0) ? "" : "[\(String(codeno))] "
         let message = error?.localizedDescription ?? "Everything is good!"
-        let code = error?.code ?? 0
+        let fulldesc = "\(code)\(message)"
         
         VStack {
-            Text("[\(String(code))] \(message)")
+            Text(fulldesc)
                 .padding()
         }
+        .foregroundColor(Color(fgColour))
+        .background(Color(bgColour))
         .onAppear() {
             storeKit_Auth() { nserror in
                 self.error = nserror
@@ -74,13 +81,14 @@ func capability_Check(completion: @escaping (NSError?) -> Void) {
             if let skerror = error as? SKError {
                 switch skerror.code {
                 case .unknown:
-                    completion(err(no: -33017, message: "[\(skerror.errorCode)] requestCapabilities reports an unknown error: \(skerror.localizedDescription)"))
+                    // This is the error that happens on some production machines:
+                    completion(err(no: -33017, message: "[\(skerror.errorCode)] [\(skerror.userStuff)] requestCapabilities reports an unknown error: \(skerror.localizedDescription)"))
                 case .cloudServicePermissionDenied:
-                    completion(err(no: -33013, message: "[\(skerror.errorCode)] requestCapabilities reports cloudServicePermissionDenied"))
+                    completion(err(no: -33013, message: "[\(skerror.errorCode)] [\(skerror.userStuff)] requestCapabilities reports cloudServicePermissionDenied"))
                 case .cloudServiceNetworkConnectionFailed:
-                    completion(err(no: -33014, message: "[\(skerror.errorCode)] requestCapabilities reports cloudServiceNetworkConnectionFailed"))
+                    completion(err(no: -33014, message: "[\(skerror.errorCode)] [\(skerror.userStuff)] requestCapabilities reports cloudServiceNetworkConnectionFailed"))
                 default:
-                    completion(err(no: -33019, message: "[\(skerror.errorCode)] requestCapabilities reports an unexpected error: \(skerror.localizedDescription)"))
+                    completion(err(no: -33019, message: "[\(skerror.errorCode)] [\(skerror.userStuff)] requestCapabilities reports an unexpected error: \(skerror.localizedDescription)"))
                 }
             } else {
                 completion(err(no: -33018, message: "SKCloudServiceController reports the following Non-StoreKit error: \(error.localizedDescription)"))
@@ -100,6 +108,20 @@ func capability_Check(completion: @escaping (NSError?) -> Void) {
         
         completion(nil)
     })
+}
+
+extension SKError {
+    var userStuff: String {
+        get {
+            var ret = ""
+            for (key, value) in self.userInfo {
+                if let strValue = value as? String {
+                    ret.append("\(key)=\(strValue); ")
+                }
+            }
+            return ret
+        }
+    }
 }
 
 func err(no: Int, message: String) -> NSError {
